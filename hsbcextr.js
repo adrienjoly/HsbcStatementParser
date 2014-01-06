@@ -8,6 +8,7 @@ function extractTextPages(pdf){
 	return pdf.data.Pages.map(function(page){
 		return page.Texts.map(function(text){
 			return [decodeURIComponent(text.R[0].T), text.x];
+			// each line is [text, x-pos]
 		});
 	});
 }
@@ -21,8 +22,27 @@ function extractText(textPages){
 var RE_DATE = /\d\d\.\d\d\.\d\d\d\d/g;
 var RE_DATE_SHORT = /\d\d\.\d\d/g;
 
+function Cursor(lines, valFct){
+	var i = 0;
+	this.line = null;
+	this.rawLine = null;
+
+	this.next = function(){
+		return this.line = valFct(this.rawLine = lines[i++]);
+	}
+
+	this.parseUntil = function(str){
+		do {
+			this.next();
+		} while(this.line && this.line.indexOf(str));
+		return this.line == str;
+	}
+}
+
 function parseText(text){
-	var OP_COLS = ["Date", "Détail", "Valeur", "exo", "Débit", "Crédit"];
+	var OP_COLS = ["Date", "Détail", "Valeur", "e" /*exo*/, "Débit", "Crédit"];
+	var colPos = [];
+
 	var bankSta = {
 		acctNum: null,
 		dateFrom: null,
@@ -31,21 +51,10 @@ function parseText(text){
 		balTo: null,
 		ops: []
 	};
-	var ops = [];
 
-	var i = 0, line = null;
-	function next(){
-		return line = text[i++];
-	}
+	var cur = new Cursor(text, function(line){return line[0];});
 
-	function parseUntil(str){
-		do {
-			line = next();
-		} while(line && line.indexOf(str));
-		return line == str;
-	}
-
-	function parseOperation(){
+	cur.parseOperation = function(){
 		var op = {
 			date: null,
 			text: [],
@@ -55,34 +64,43 @@ function parseText(text){
 			credit: null
 		};
 		// 1) date
-		op.date = next();
+		op.date = this.next();
 		// 2) text + dateVal
 		do {
-			next();
-			if (line.match(RE_DATE_SHORT))
-				op.dateVal = line;
+			this.next();
+			if (this.line.match(RE_DATE_SHORT))
+				op.dateVal = this.line;
 			else
-				op.text.push(line);
+				op.text.push(this.line);
 		} while(!op.dateVal);
 		// 3)
 		
 		return op.text.length && op;
 	}
 
-	parseUntil("Votre Relevé de Compte");
-	parseUntil("Compte n°");
-	bankSta.acctNum = next() + next();
+	cur.parseUntil("Votre Relevé de Compte");
+	cur.parseUntil("Compte n°");
+	bankSta.acctNum = cur.next() + cur.next();
 
-	parseUntil("Période");
-	var periode = next().match(RE_DATE);
+	cur.parseUntil("Période");
+	var periode = cur.next().match(RE_DATE);
 	bankSta.dateTo = periode.pop();
 	bankSta.dateFrom = periode.pop();
 
-	parseUntil("SOLDE DE DEBUT DE PERIODE");
-	bankSta.balFrom = next();
+	for (var i in OP_COLS) {
+		cur.parseUntil(OP_COLS[i]);
+		colPos.push(cur.rawLine[1]);
+	}
+
+	console.log("column positions")
+	console.log(OP_COLS.join("\t"));
+	console.log(colPos.join("\t"));
+
+	cur.parseUntil("SOLDE DE DEBUT DE PERIODE");
+	bankSta.balFrom = cur.next();
 
 	for(;;){
-		var op = parseOperation();
+		var op = cur.parseOperation();
 		if (op)
 			bankSta.ops.push(op);
 		else
@@ -109,8 +127,8 @@ pdfParser.on("pdfParser_dataError", function(err){
 pdfParser.on("pdfParser_dataReady", function(pdf){
 	var textPages = extractTextPages(pdf);
 	var text = extractText(textPages);
-	console.log("textPages", text);
-	//var bankStatement = parseText(text);
+	//console.log("textPages", text);
+	var bankStatement = parseText(text);
 });
 
 // start parsing
