@@ -68,13 +68,19 @@ function parseText(text){
 		// 2) text + dateVal
 		do {
 			this.next();
-			if (this.line.match(RE_DATE_SHORT))
+			/*if (this.line.match(RE_DATE_SHORT))
 				op.dateVal = this.line;
 			else
+				op.text.push(this.line);*/
+			if (this.rawLine[1] < colPos[2])
 				op.text.push(this.line);
-		} while(!op.dateVal);
+			else
+				break;
+		} while(/*!op.dateVal*/ 1);
 		// 3)
-		
+
+		op.dateVal = this.line;
+
 		return op.text.length && op;
 	}
 
