@@ -2,12 +2,12 @@ var PFParser = require("./node_modules/pdf2json/pdfparser");
 
 // conversion functions
 
-var PAGE_BREAK = "^^^";
+var PAGE_BREAK = ["^^^", "^^^"];
 
 function extractTextPages(pdf){
 	return pdf.data.Pages.map(function(page){
 		return page.Texts.map(function(text){
-			return decodeURIComponent(text.R[0].T);
+			return [decodeURIComponent(text.R[0].T), text.x];
 		});
 	});
 }
@@ -109,8 +109,8 @@ pdfParser.on("pdfParser_dataError", function(err){
 pdfParser.on("pdfParser_dataReady", function(pdf){
 	var textPages = extractTextPages(pdf);
 	var text = extractText(textPages);
-	//console.log("textPages", text);
-	var bankStatement = parseText(text);
+	console.log("textPages", text);
+	//var bankStatement = parseText(text);
 });
 
 // start parsing
