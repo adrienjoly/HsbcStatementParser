@@ -1,5 +1,7 @@
 var PFParser = require("./node_modules/pdf2json/pdfparser");
 
+// doc: https://github.com/modesty/pdf2json
+
 // conversion functions
 
 var PAGE_BREAK = ["^^^", "^^^"];
@@ -41,7 +43,8 @@ function Cursor(lines, valFct){
 
 function parseText(text){
 	var OP_COLS = ["Date", "Détail", "Valeur", "e" /*exo*/, "Débit", "Crédit"];
-	var colPos = [];
+	var OP_COL_IDS = ["date", "text", "datev", "exo", "debit", "credit"];
+	var colPos =     [    16,     59,      66,    70,      86          ];
 
 	var bankSta = {
 		acctNum: null,
@@ -55,33 +58,23 @@ function parseText(text){
 	var cur = new Cursor(text, function(line){return line[0];});
 
 	cur.parseOperation = function(){
-		var op = {
-			date: null,
-			text: [],
-			dateVal: null,
-			exo: null,
-			debit: null,
-			credit: null
-		};
-		// 1) date
-		op.date = this.next();
-		// 2) text + dateVal
-		do {
+		var op = {};
+		//console.log("===new op");
+		if (!this.line || !this.line.match(RE_DATE_SHORT))
+			return //throw new Error("operation must start with a short date");
+		for(;;) {
+			for (var i=0; i<colPos.length; ++i)
+				if (this.rawLine[1] < colPos[i])
+					break;
+			if (op[OP_COL_IDS[i]])
+				op[OP_COL_IDS[i]] += "\n" + this.line;	
+			else
+				op[OP_COL_IDS[i]] = this.line;
+			//console.log(OP_COL_IDS[i], this.line);
 			this.next();
-			/*if (this.line.match(RE_DATE_SHORT))
-				op.dateVal = this.line;
-			else
-				op.text.push(this.line);*/
-			if (this.rawLine[1] < colPos[2])
-				op.text.push(this.line);
-			else
-				break;
-		} while(/*!op.dateVal*/ 1);
-		// 3)
-
-		op.dateVal = this.line;
-
-		return op.text.length && op;
+			if (!this.line || this.rawLine[1] < colPos[0])
+				return op;
+		}
 	}
 
 	cur.parseUntil("Votre Relevé de Compte");
@@ -95,8 +88,10 @@ function parseText(text){
 
 	for (var i in OP_COLS) {
 		cur.parseUntil(OP_COLS[i]);
-		colPos.push(cur.rawLine[1]);
+		//colPos.push(cur.rawLine[1]);
 	}
+
+	//colPos.push(9999); // max x value
 
 	console.log("column positions")
 	console.log(OP_COLS.join("\t"));
@@ -104,6 +99,8 @@ function parseText(text){
 
 	cur.parseUntil("SOLDE DE DEBUT DE PERIODE");
 	bankSta.balFrom = cur.next();
+
+	cur.next();
 
 	for(;;){
 		var op = cur.parseOperation();
@@ -140,4 +137,8 @@ pdfParser.on("pdfParser_dataReady", function(pdf){
 // start parsing
 
 var pdfFilePath = "20130102_RELEVE DE COMPTE_00360070251.pdf";
-pdfParser.loadPDF(pdfFilePath);
+try {
+	pdfParser.loadPDF(pdfFilePath);
+} catch (e) {
+	console.error(e.stack);
+}
