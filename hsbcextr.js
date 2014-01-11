@@ -23,6 +23,7 @@ function extractText(textPages){
 
 var RE_DATE = /\d\d\.\d\d\.\d\d\d\d/g;
 var RE_DATE_SHORT = /\d\d\.\d\d/g;
+var OP_COLS = ["Date", "Détail", "Valeur", "e" /*exo*/, "Débit", "Crédit"];
 
 function Cursor(lines, valFct){
 	var i = 0;
@@ -41,25 +42,27 @@ function Cursor(lines, valFct){
 	}
 }
 
-function parseText(text){
-	var OP_COLS = ["Date", "Détail", "Valeur", "e" /*exo*/, "Débit", "Crédit"];
+function HsbcCursor(lines){
+	// call super constructor
+	Cursor.call(this, lines, function(line){return line[0];})
+
 	var OP_COL_IDS = ["date", "text", "datev", "exo", "debit", "credit"];
 	var colPos =     [    16,     59,      66,    70,      86          ];
 
-	var bankSta = {
-		acctNum: null,
-		dateFrom: null,
-		dateTo: null,
-		balFrom: null,
-		balTo: null,
-		ops: []
+	this.detectColumns = function(){
+		for (var i in OP_COLS) {
+			this.parseUntil(OP_COLS[i]);
+			//colPos.push(cur.rawLine[1]);
+		}
+		//colPos.push(9999); // max x value
+		console.log("column positions")
+		console.log(OP_COLS.join("\t"));
+		console.log(colPos.join("\t"));
 	};
 
-	var cur = new Cursor(text, function(line){return line[0];});
-
-	cur.parseOperation = function(){
+	this.parseOperation = function(){
 		var op = {};
-		//console.log("===new op");
+		console.log("===new op");
 		if (!this.line || !this.line.match(RE_DATE_SHORT))
 			return //throw new Error("operation must start with a short date");
 		for(;;) {
@@ -70,12 +73,27 @@ function parseText(text){
 				op[OP_COL_IDS[i]] += "\n" + this.line;	
 			else
 				op[OP_COL_IDS[i]] = this.line;
-			//console.log(OP_COL_IDS[i], this.line);
+			console.log(OP_COL_IDS[i], this.line);
 			this.next();
 			if (!this.line || this.rawLine[1] < colPos[0])
 				return op;
 		}
-	}
+	};
+}
+
+HsbcCursor.prototype = new Cursor;
+
+function parseText(text){
+	var bankSta = {
+		acctNum: null,
+		dateFrom: null,
+		dateTo: null,
+		balFrom: null,
+		balTo: null,
+		ops: []
+	};
+
+	var cur = new HsbcCursor(text);
 
 	cur.parseUntil("Votre Relevé de Compte");
 	cur.parseUntil("Compte n°");
@@ -86,22 +104,13 @@ function parseText(text){
 	bankSta.dateTo = periode.pop();
 	bankSta.dateFrom = periode.pop();
 
-	for (var i in OP_COLS) {
-		cur.parseUntil(OP_COLS[i]);
-		//colPos.push(cur.rawLine[1]);
-	}
-
-	//colPos.push(9999); // max x value
-
-	console.log("column positions")
-	console.log(OP_COLS.join("\t"));
-	console.log(colPos.join("\t"));
+	cur.detectColumns();
 
 	cur.parseUntil("SOLDE DE DEBUT DE PERIODE");
 	bankSta.balFrom = cur.next();
 
+	// operations
 	cur.next();
-
 	for(;;){
 		var op = cur.parseOperation();
 		if (op)
