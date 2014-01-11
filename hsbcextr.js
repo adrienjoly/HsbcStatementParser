@@ -2,6 +2,10 @@ var assert = require("assert");
 var PFParser = require("./node_modules/pdf2json/pdfparser");
 // doc: https://github.com/modesty/pdf2json
 
+function parseAmount(str){
+	return parseFloat(str.replace(/\./g, '').replace(",", "."));
+}
+
 function Cursor(lines, valFct){
 	var i = 0;
 	this.line = null;
@@ -64,7 +68,7 @@ function HsbcCursor(lines){
 			if (op[OP_COL_IDS[i]])
 				op[OP_COL_IDS[i]] += "\n" + this.line;
 			else if (i >= OP_AMOUNT_IDX)
-				op[OP_COL_IDS[i]] = parseFloat(this.line.replace(/\./g, '').replace(",", "."));
+				op[OP_COL_IDS[i]] = parseAmount(this.line);
 			else
 				op[OP_COL_IDS[i]] = this.line;
 			this.next();
@@ -128,6 +132,22 @@ function HsbcStatementParser(){
 		});
 	}
 
+	function validateTotals(bankSta){
+		var totalDebit = 0, totalCredit = 0;
+		bankSta.ops.map(function(op){
+			if (op.debit)
+				totalDebit += op.debit;
+			else if (op.credit)
+				totalCredit += op.credit;
+			else
+				throw new Error("operation without credit or debit");
+		});
+		//console.log(totalDebit, totalCredit);
+		assert(Math.abs(totalDebit - bankSta.totDebit) < 0.001, "total debit is not valid");
+		assert(Math.abs(totalCredit - bankSta.totCredit) < 0.001, "total credit is not valid");
+		return totalCredit - totalDebit;
+	}
+
 	function parseLines(lines){
 		var bankSta = {
 			acctNum: null,
@@ -135,6 +155,8 @@ function HsbcStatementParser(){
 			dateTo: null,
 			balFrom: null,
 			balTo: null,
+			totDebit: null,
+			totCredit: null,
 			ops: []
 		};
 
@@ -152,9 +174,20 @@ function HsbcStatementParser(){
 		cur.detectColumns();
 
 		cur.parseUntil("SOLDE DE DEBUT DE PERIODE");
-		bankSta.balFrom = cur.next();
+		bankSta.balFrom = parseAmount(cur.next());
 
 		bankSta.ops = cur.parseOperations();
+		bankSta.totDebit = parseAmount(cur.next());
+		bankSta.totCredit = parseAmount(cur.next());
+		//console.log(bankSta.totDebit, bankSta.totCredit);
+		var total = validateTotals(bankSta);
+
+		cur.parseUntil("SOLDE DE FIN DE PERIODE");
+		bankSta.balTo = parseAmount(cur.next());
+		//console.log(["balance   (to - from): ", bankSta.balTo, bankSta.balFrom, Math.round((bankSta.balTo - bankSta.balFrom) * 100)/100].join(' '));
+		//console.log(["total (credit - debit):", bankSta.totCredit, bankSta.totDebit, Math.round((bankSta.totCredit - bankSta.totDebit) * 100)/100].join(' '));
+		assert(Math.abs(bankSta.balFrom + total - bankSta.balTo) < 0.001, "totals don't match");
+
 		return bankSta;
 	}
 
@@ -163,8 +196,6 @@ function HsbcStatementParser(){
 		pdfParser.loadPDF(pdfFilePath);
 	};
 }
-
-
 
 // parse bank statement
 
