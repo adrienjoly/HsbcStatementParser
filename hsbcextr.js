@@ -173,7 +173,7 @@ function HsbcStatementParser(){
 	var parser = new HsbcStatementParser();
 	parser.parseFile(pdfFilePath, function(err, bankStatement){
 		if (err)
-			throw err;
+			console.error(err.stack);
 		//console.log("bank Statement", bankStatement);
 		console.log(bankStatement.ops.map(function(op){
 			//return op.date + ", " + op.text.replace(/[\n\s]+/g, " ");
