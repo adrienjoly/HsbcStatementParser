@@ -62,7 +62,7 @@ function HsbcCursor(lines){
 
 	this.parseOperation = function(){
 		var op = {};
-		console.log("===new op");
+		//console.log("===new op");
 		if (!this.line || !this.line.match(RE_DATE_SHORT))
 			return //throw new Error("operation must start with a short date");
 		for(;;) {
@@ -73,7 +73,7 @@ function HsbcCursor(lines){
 				op[OP_COL_IDS[i]] += "\n" + this.line;	
 			else
 				op[OP_COL_IDS[i]] = this.line;
-			console.log(OP_COL_IDS[i], this.line);
+			//console.log(OP_COL_IDS[i], this.line);
 			this.next();
 			if (!this.line || this.rawLine[1] < colPos[0])
 				return op;
