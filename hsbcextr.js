@@ -48,6 +48,7 @@ function HsbcCursor(lines){
 
 	var OP_COL_IDS = ["date", "text", "datev", "exo", "debit", "credit"];
 	var colPos =     [    16,     59,      66,    70,      86          ];
+	var OP_AMOUNT_IDX = 4;
 
 	this.detectColumns = function(){
 		for (var i in OP_COLS) {
@@ -60,15 +61,17 @@ function HsbcCursor(lines){
 		//console.log(colPos.join("\t"));
 	};
 
-	this.parseOperation = function(){
+	function parseOperation(){
 		var op = {};
 		//console.log("===new op");
 		if (!this.line || !this.line.match(RE_DATE_SHORT))
-			return //throw new Error("operation must start with a short date");
+			return null; //throw new Error("operation must start with a short date");
 		for(;;) {
 			for (var i=0; i<colPos.length; ++i)
 				if (this.rawLine[1] < colPos[i])
 					break;
+			if (op.debit && i > OP_AMOUNT_IDX)
+				break;
 			if (op[OP_COL_IDS[i]])
 				op[OP_COL_IDS[i]] += "\n" + this.line;	
 			else
@@ -76,8 +79,23 @@ function HsbcCursor(lines){
 			//console.log(OP_COL_IDS[i], this.line);
 			this.next();
 			if (!this.line || this.rawLine[1] < colPos[0])
-				return op;
+				break;
 		}
+		return op;
+	};
+
+	this.parseOperations = function(){
+		var ops = [];
+		this.next();
+		for(;;){
+			var op = parseOperation.call(this);
+			console.log(!!op);
+			if (op)
+				ops.push(op);
+			else
+				break;
+		}
+		return ops;
 	};
 }
 
@@ -109,20 +127,7 @@ function parseText(text){
 	cur.parseUntil("SOLDE DE DEBUT DE PERIODE");
 	bankSta.balFrom = cur.next();
 
-	// operations
-	cur.next();
-	for(;;){
-		var op = cur.parseOperation();
-		if (op)
-			bankSta.ops.push(op);
-		else
-			break;
-	}
-
-	//console.log("bank Statement", bankSta);
-	console.log("bank Operations\n" + bankSta.ops.map(function(op){
-		return op.date + " : " + op.text.replace(/\n/g, " ");
-	}).join("\n"));
+	bankSta.ops = cur.parseOperations();
 
 	//textPages.
 	return bankSta;
@@ -141,6 +146,10 @@ pdfParser.on("pdfParser_dataReady", function(pdf){
 	var text = extractText(textPages);
 	//console.log("textPages", text);
 	var bankStatement = parseText(text);
+	console.log("bank Statement", bankStatement);
+	/*console.log("bank Operations\n" + bankSta.ops.map(function(op){
+		return op.date + " : " + op.text.replace(/\n/g, " ");
+	}).join("\n"));*/
 });
 
 // start parsing
