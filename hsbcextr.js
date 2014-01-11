@@ -55,9 +55,9 @@ function HsbcCursor(lines){
 			//colPos.push(cur.rawLine[1]);
 		}
 		//colPos.push(9999); // max x value
-		console.log("column positions")
-		console.log(OP_COLS.join("\t"));
-		console.log(colPos.join("\t"));
+		//console.log("column positions")
+		//console.log(OP_COLS.join("\t"));
+		//console.log(colPos.join("\t"));
 	};
 
 	this.parseOperation = function(){
@@ -119,9 +119,9 @@ function parseText(text){
 			break;
 	}
 
-	console.log("bank Statement", bankSta);
-	console.log("bank Operations\n", bankSta.ops.map(function(op){
-		return [op.date, op.text.join(" ")];
+	//console.log("bank Statement", bankSta);
+	console.log("bank Operations\n" + bankSta.ops.map(function(op){
+		return op.date + " : " + op.text.replace(/\n/g, " ");
 	}).join("\n"));
 
 	//textPages.
