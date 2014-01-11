@@ -1,52 +1,28 @@
 var assert = require("assert");
 var PFParser = require("./node_modules/pdf2json/pdfparser");
-
 // doc: https://github.com/modesty/pdf2json
-
-// conversion functions
-
-var PAGE_BREAK = ["^^^", "^^^"];
-
-function extractTextPages(pdf){
-	return pdf.data.Pages.map(function(page){
-		return page.Texts.map(function(text){
-			return [decodeURIComponent(text.R[0].T), text.x];
-			// each line is [text, x-pos]
-		});
-	});
-}
-
-function extractText(textPages){
-	return textPages.reduce(function(a,b){
-		return a.concat([PAGE_BREAK]).concat(b);
-	});
-}
-
-var RE_DATE = /\d\d\.\d\d\.\d\d\d\d/g;
-var RE_DATE_SHORT = /\d\d\.\d\d/g;
-var OP_COLS = ["Date", "Détail", "Valeur", "e" /*exo*/, "Débit", "Crédit"];
 
 function Cursor(lines, valFct){
 	var i = 0;
 	this.line = null;
 	this.rawLine = null;
-
 	this.next = function(){
 		return this.line = valFct(this.rawLine = lines[i++]);
-	}
-
+	};
 	this.parseUntil = function(str){
 		do {
 			this.next();
 		} while(this.line && this.line.indexOf(str));
 		return this.line == str;
-	}
+	};
 }
 
 function HsbcCursor(lines){
 	// call super constructor
 	Cursor.call(this, lines, function(line){return line[0];})
 
+	var RE_DATE_SHORT = /\d\d\.\d\d/g;
+	var OP_COLS = ["Date", "Détail", "Valeur", "e" /*exo*/, "Débit", "Crédit"];
 	var OP_COL_IDS = ["date", "text", "datev", "exo", "debit", "credit"];
 	var colPos =     [    16,     59,      66,    70,      86          ];
 	var OP_AMOUNT_IDX = 4;
@@ -54,14 +30,10 @@ function HsbcCursor(lines){
 	var NEXT_PAGE_HEADER = "Votre Relevé de Compte";
 
 	this.detectColumns = function(){
-		for (var i in OP_COLS) {
-			this.parseUntil(OP_COLS[i]);
-			//colPos.push(cur.rawLine[1]);
-		}
-		//colPos.push(9999); // max x value
-		//console.log("column positions")
-		//console.log(OP_COLS.join("\t"));
-		//console.log(colPos.join("\t"));
+		//for (var i in OP_COLS)
+		//	colPos.push(cur.rawLine[1]);
+		//console.log("column positions\n" + OP_COLS.join("\t") + "\n" + colPos.join("\t"));
+		this.parseUntil(OP_COLS[OP_COLS.length-1]);
 	};
 
 	function parseOperation(){
@@ -90,7 +62,9 @@ function HsbcCursor(lines){
 			// set (or append to) operation's current field 
 			//console.log(OP_COL_IDS[i], this.line);
 			if (op[OP_COL_IDS[i]])
-				op[OP_COL_IDS[i]] += "\n" + this.line;	
+				op[OP_COL_IDS[i]] += "\n" + this.line;
+			else if (i >= OP_AMOUNT_IDX)
+				op[OP_COL_IDS[i]] = parseFloat(this.line.replace(/\./g, '').replace(",", "."));
 			else
 				op[OP_COL_IDS[i]] = this.line;
 			this.next();
@@ -120,62 +94,90 @@ function HsbcCursor(lines){
 
 HsbcCursor.prototype = new Cursor;
 
-function parseText(text){
-	var bankSta = {
-		acctNum: null,
-		dateFrom: null,
-		dateTo: null,
-		balFrom: null,
-		balTo: null,
-		ops: []
+function HsbcStatementParser(){
+
+	var RE_DATE = /\d\d\.\d\d\.\d\d\d\d/g;
+
+	var pdfParser = new PFParser();
+	var callbackFct = null;
+
+	pdfParser.on("pdfParser_dataError", function(err){
+		(callbackFct || console.error)(err);
+	});
+
+	pdfParser.on("pdfParser_dataReady", function(pdfData){
+		try{
+			var lines = extractLines(pdfData);
+			var bankStatement = parseLines(lines);
+			callbackFct(null, bankStatement);
+		}
+		catch(e){
+			callbackFct(e);
+		}
+	});
+
+	function extractLines(pdf){
+		return pdf.data.Pages.map(function(page){
+			return page.Texts.map(function(text){
+				// each line is [text, x-pos]
+				return [decodeURIComponent(text.R[0].T), text.x];
+			});
+		}).reduce(function(a,b){
+			// concatenate pages
+			return a.concat(b);
+		});
+	}
+
+	function parseLines(lines){
+		var bankSta = {
+			acctNum: null,
+			dateFrom: null,
+			dateTo: null,
+			balFrom: null,
+			balTo: null,
+			ops: []
+		};
+
+		var cur = new HsbcCursor(lines);
+
+		cur.parseUntil("Votre Relevé de Compte");
+		cur.parseUntil("Compte n°");
+		bankSta.acctNum = cur.next() + cur.next();
+
+		cur.parseUntil("Période");
+		var periode = cur.next().match(RE_DATE);
+		bankSta.dateTo = periode.pop();
+		bankSta.dateFrom = periode.pop();
+
+		cur.detectColumns();
+
+		cur.parseUntil("SOLDE DE DEBUT DE PERIODE");
+		bankSta.balFrom = cur.next();
+
+		bankSta.ops = cur.parseOperations();
+		return bankSta;
+	}
+
+	this.parseFile = function(pdfFilePath, cb){
+		callbackFct = cb;
+		pdfParser.loadPDF(pdfFilePath);
 	};
-
-	var cur = new HsbcCursor(text);
-
-	cur.parseUntil("Votre Relevé de Compte");
-	cur.parseUntil("Compte n°");
-	bankSta.acctNum = cur.next() + cur.next();
-
-	cur.parseUntil("Période");
-	var periode = cur.next().match(RE_DATE);
-	bankSta.dateTo = periode.pop();
-	bankSta.dateFrom = periode.pop();
-
-	cur.detectColumns();
-
-	cur.parseUntil("SOLDE DE DEBUT DE PERIODE");
-	bankSta.balFrom = cur.next();
-
-	bankSta.ops = cur.parseOperations();
-
-	//textPages.
-	return bankSta;
 }
 
-// init parser
 
-var pdfParser = new PFParser();
 
-pdfParser.on("pdfParser_dataError", function(err){
-	console.error(err);
-});
+// parse bank statement
 
-pdfParser.on("pdfParser_dataReady", function(pdf){
-	try {
-		var textPages = extractTextPages(pdf);
-		var text = extractText(textPages);
-		//console.log("textPages", text);
-		var bankStatement = parseText(text);
-	} catch (e) {
-		console.error(e.stack);
-	}
-	//console.log("bank Statement", bankStatement);
-	console.log(bankStatement.ops.map(function(op){
-		return op.date + ", " + op.text.replace(/[\n\s]+/g, " ");
-	}).join("\n"));
-});
-
-// start parsing
-
-var pdfFilePath = "20130102_RELEVE DE COMPTE_00360070251.pdf";
-pdfParser.loadPDF(pdfFilePath);
+(function main(){
+	var pdfFilePath = "20130102_RELEVE DE COMPTE_00360070251.pdf";
+	var parser = new HsbcStatementParser();
+	parser.parseFile(pdfFilePath, function(err, bankStatement){
+		if (err)
+			throw err;
+		//console.log("bank Statement", bankStatement);
+		console.log(bankStatement.ops.map(function(op){
+			//return op.date + ", " + op.text.replace(/[\n\s]+/g, " ");
+			return [op.date, op.text.replace(/[\n\s]+/g, " ").substr(0, 14), op.credit || -op.debit].join("\t");
+		}).join("\n"));
+	});
+})();
