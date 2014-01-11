@@ -1,3 +1,4 @@
+var assert = require("assert");
 var PFParser = require("./node_modules/pdf2json/pdfparser");
 
 // doc: https://github.com/modesty/pdf2json
@@ -50,6 +51,7 @@ function HsbcCursor(lines){
 	var colPos =     [    16,     59,      66,    70,      86          ];
 	var OP_AMOUNT_IDX = 4;
 	var END_OF_OPERATIONS = "TOTAL DES MOUVEMENTS";
+	var NEXT_PAGE_HEADER = "Votre Relevé de Compte";
 
 	this.detectColumns = function(){
 		for (var i in OP_COLS) {
@@ -65,20 +67,19 @@ function HsbcCursor(lines){
 	function parseOperation(){
 		var op = {};
 		//console.log("===new op");
-		if (!this.line || !this.line.match(RE_DATE_SHORT))
-			return null; //throw new Error("operation must start with a short date");
+		assert.ok(this.line && this.line.match(RE_DATE_SHORT), "operation must start with a short date: "+this.line);
 		for(;;) {
+			// detect the column number i of current value, based on its x-position
 			for (var i=0; i<colPos.length; ++i)
 				if (this.rawLine[1] < colPos[i])
 					break;
-			// reading a "credit" value after having read a "debit" value for the same operation
-			// => current line might be a page number => skip to next page's operations
 			if (op.debit && i > OP_AMOUNT_IDX) {
+				// reading a "credit" value after having read a "debit" value for the same operation
+				// => current line might be a page number => skip to next page's operations
 				//console.log(" - - - skipping to next operations - - - ");
-				this.parseUntil("Votre Relevé de Compte");
+				this.parseUntil(NEXT_PAGE_HEADER);
 				this.detectColumns();
 				this.next();
-				//console.log("=>", this.line)
 				if (!this.line || this.line.match(RE_DATE_SHORT)) {
 					//console.log("(i) no more line, or new operation => end of current operation");
 					return op;
@@ -86,22 +87,24 @@ function HsbcCursor(lines){
 				else
 					continue; // re-read the current line
 			}
+			// set (or append to) operation's current field 
+			//console.log(OP_COL_IDS[i], this.line);
 			if (op[OP_COL_IDS[i]])
 				op[OP_COL_IDS[i]] += "\n" + this.line;	
 			else
 				op[OP_COL_IDS[i]] = this.line;
-			//console.log(OP_COL_IDS[i], this.line);
 			this.next();
-			if (!this.line || this.rawLine[1] < colPos[0] || this.line == END_OF_OPERATIONS)
-				break;
+			if (!this.line || this.rawLine[1] < colPos[0] || this.line == END_OF_OPERATIONS) {
+				//console.log("(i) no more line, or new operation => end of current operation");
+				return op;
+			}
 		}
-		return op;
 	};
 
 	this.parseOperations = function(){
 		var ops = [];
 		this.next();
-		for(;;){
+		for(;this.line != END_OF_OPERATIONS;){
 			var op = parseOperation.call(this);
 			if (op) {
 				ops.push(op);
@@ -110,6 +113,7 @@ function HsbcCursor(lines){
 			else
 				break;
 		}
+		assert.equal(this.line, END_OF_OPERATIONS);
 		return ops;
 	};
 }
@@ -157,10 +161,14 @@ pdfParser.on("pdfParser_dataError", function(err){
 });
 
 pdfParser.on("pdfParser_dataReady", function(pdf){
-	var textPages = extractTextPages(pdf);
-	var text = extractText(textPages);
-	//console.log("textPages", text);
-	var bankStatement = parseText(text);
+	try {
+		var textPages = extractTextPages(pdf);
+		var text = extractText(textPages);
+		//console.log("textPages", text);
+		var bankStatement = parseText(text);
+	} catch (e) {
+		console.error(e.stack);
+	}
 	//console.log("bank Statement", bankStatement);
 	console.log(bankStatement.ops.map(function(op){
 		return op.date + ", " + op.text.replace(/[\n\s]+/g, " ");
@@ -170,8 +178,4 @@ pdfParser.on("pdfParser_dataReady", function(pdf){
 // start parsing
 
 var pdfFilePath = "20130102_RELEVE DE COMPTE_00360070251.pdf";
-try {
-	pdfParser.loadPDF(pdfFilePath);
-} catch (e) {
-	console.error(e.stack);
-}
+pdfParser.loadPDF(pdfFilePath);
