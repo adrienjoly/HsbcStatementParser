@@ -1,7 +1,11 @@
 {
   "name": "hsbc-statement-parser",
-  "version": "0.1.0",
+  "version": "0.1.1",
+  "license": "BSD",
   "description": "Parses and converts HSBC bank statements downloaded in PDF format into a list of operations in JSON or TSV format.",
+  "homepage": "https://github.com/adrienjoly/HsbcStatementParser",
+  "main": "./hsbcextr.js",
+
   "keywords": [
     "hsbc",
     "bank",
@@ -14,22 +18,23 @@
     "convert pdf to json",
     "JSON"
   ],
+
   "author": {
     "name": "Adrien Joly",
     "email": "adrien.joly@gmail.com",
     "url": "http://adrienjoly.com"
   },
-  "homepage": "https://github.com/adrienjoly/HsbcStatementParser",
+
   "repository": {
     "type": "git",
     "url": "git://github.com/adrienjoly/HsbcStatementParser.git"
   },
-  "main": "./hsbcextr.js",
+
   "engines": {
     "node": ">=0.8"
   },
+
   "dependencies": {
     "pdf2json": "0.6.2"
-  },
-  "readme": "https://github.com/adrienjoly/HsbcStatementParser/blob/master/readme.md"
+  }
 }
