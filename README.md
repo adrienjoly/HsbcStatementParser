@@ -15,12 +15,12 @@ hsbcextr <json|tsv|null|1line|test> <pdf_file_name_1> [<pdf_file_name_2> [<pdf_f
 Usage
 -----
 
-  var parser = new HsbcStatementParser();
-  parser.parseFile(pdfFilePath, function(err, sta){
-  	if (err)
-  		console.error(err.stack);
-  	else {
-  	  console.log("parsed " + sta.ops.length + " operations");
-  	  console.log("closing balance: " + sta.balTo);
-  	}
-  });
+    var parser = new HsbcStatementParser();
+    parser.parseFile(pdfFilePath, function(err, sta){
+    	if (err)
+    		console.error(err.stack);
+    	else {
+    	  console.log("parsed " + sta.ops.length + " operations");
+    	  console.log("closing balance: " + sta.balTo);
+    	}
+    });
