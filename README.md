@@ -7,6 +7,11 @@ Relies on [Modesty's PDF2JSON](http://github.com/modesty/pdf2json) Node.js modul
 
 Only supports statements in French language, for now.
 
+Installation
+------------
+
+    npm install hsbc-statement-parser
+
 CLI Syntax
 ----------
 
