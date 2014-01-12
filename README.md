@@ -10,7 +10,7 @@ Only supports statements in French language, for now.
 CLI Syntax
 ----------
 
-hsbcextr <json|tsv|null|1line|test> <pdf_file_name_1> [<pdf_file_name_2> [<pdf_file_name_3> ...]]
+    hsbcextr <json|tsv|null|1line|test> <pdf_file_name_1> [<pdf_file_name_2> [<pdf_file_name_3> ...]]
 
 Usage
 -----
