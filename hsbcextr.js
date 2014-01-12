@@ -7,10 +7,14 @@ var renderers = {
 	"json": function(bankStatement){
 		return sys.inspect(bankStatement);
 	},
+	"csv": function(sta){
+		return sta.ops.map(function(op){
+			return ["\"" + op.date + "\"", "\"" + op.text.replace(/[\"]+/g, "\\\"") + "\"", "\"" + op.datev + "\"", op.exo, op.debit, op.credit].join(",");
+		}).join("\n");
+	},
 	"tsv": function(sta){
 		return sta.ops.map(function(op){
-			//return op.date + ", " + op.text.replace(/[\n\s]+/g, " ");
-			return [op.date, op.text.replace(/[\n\s]+/g, " ").substr(0, 14), op.credit || -op.debit].join("\t");
+			return [op.date, op.text.replace(/[\n]+/g, ", ").replace(/[\s\t]+/g, " "), op.datev, op.exo, op.debit, op.credit].join("\t");
 		}).join("\n");
 	},
 	"null": function(sta){
