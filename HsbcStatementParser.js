@@ -105,18 +105,32 @@ function HsbcStatementParser(){
 	var pdfParser = new PFParser();
 	var callbackFct = null;
 
+	var bankSta = {
+		filePath: null,
+		acctNum: null,
+		dateFrom: null,
+		dateTo: null,
+		balFrom: null,
+		balTo: null,
+		totDebit: null,
+		totCredit: null,
+		ops: []
+	};
+
 	pdfParser.on("pdfParser_dataError", function(err){
-		(callbackFct || console.error)(err);
+		callbackFct(err, bankSta);
 	});
 
 	pdfParser.on("pdfParser_dataReady", function(pdfData){
 		try{
 			var lines = extractLines(pdfData);
-			var bankStatement = parseLines(lines);
-			callbackFct(null, bankStatement);
+			//console.log("read " + lines.length + " lines => parsing...")
+			parseLines(lines);
+			//console.log("done parsing!")
+			callbackFct(null, bankSta);
 		}
 		catch(e){
-			callbackFct(e);
+			callbackFct(e, bankSta);
 		}
 	});
 
@@ -132,8 +146,9 @@ function HsbcStatementParser(){
 		});
 	}
 
-	function validateTotals(bankSta){
+	function validateTotals(/*bankSta*/){
 		var totalDebit = 0, totalCredit = 0;
+		//console.log("validating totals for " + bankSta.ops.length + "operations...");
 		bankSta.ops.map(function(op){
 			if (op.debit)
 				totalDebit += op.debit;
@@ -149,17 +164,6 @@ function HsbcStatementParser(){
 	}
 
 	function parseLines(lines){
-		var bankSta = {
-			acctNum: null,
-			dateFrom: null,
-			dateTo: null,
-			balFrom: null,
-			balTo: null,
-			totDebit: null,
-			totCredit: null,
-			ops: []
-		};
-
 		var cur = new HsbcCursor(lines);
 
 		cur.parseUntil("Votre Relevé de Compte");
@@ -192,9 +196,10 @@ function HsbcStatementParser(){
 	}
 
 	this.parseFile = function(pdfFilePath, cb){
+		bankSta.filePath = pdfFilePath;
 		callbackFct = cb;
 		pdfParser.loadPDF(pdfFilePath);
 	};
 }
 
-module.exports = new HsbcStatementParser;
+module.exports = HsbcStatementParser;
