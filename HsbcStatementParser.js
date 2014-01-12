@@ -32,6 +32,7 @@ function HsbcCursor(lines){
 	var OP_AMOUNT_IDX = 4;
 	var END_OF_OPERATIONS = "TOTAL DES MOUVEMENTS";
 	var NEXT_PAGE_HEADER = "Votre Relevé de Compte";
+	var INTERMEDIATE_BALANCE = "NOUVEAU SOLDE DE DEBUT DE PERIODE";
 
 	this.detectColumns = function(){
 		//for (var i in OP_COLS)
@@ -45,6 +46,14 @@ function HsbcCursor(lines){
 		//console.log("===new op");
 		assert.ok(this.line && this.line.match(RE_DATE_SHORT), "operation must start with a short date: "+this.line);
 		for(;;) {
+			if (this.line && this.line.indexOf(INTERMEDIATE_BALANCE) == 0) {
+				this.next(); // date
+				var balance = this.next();
+				//TODO: assert(balance == )
+				this.next();
+				return op;
+			}
+
 			// detect the column number i of current value, based on its x-position
 			for (var i=0; i<colPos.length; ++i)
 				if (this.rawLine[1] < colPos[i])
