@@ -61,6 +61,9 @@ function HsbcCursor(lines){
 			for (var i=0; i<colPos.length; ++i)
 				if (this.rawLine[1] < colPos[i])
 					break;
+
+			LOG("x-position", this.rawLine[1], "-> field", OP_COL_IDS[i], "=", this.line);
+
 			if (op.debit && i > OP_AMOUNT_IDX) {
 				// reading a "credit" value after having read a "debit" value for the same operation
 				// => current line might be a page number => skip to next page's operations
