@@ -79,7 +79,6 @@ function HsbcCursor(lines){
 					continue; // re-read the current line
 			}
 			// set (or append to) operation's current field 
-			//console.log(OP_COL_IDS[i], this.line);
 			if (op[OP_COL_IDS[i]])
 				op[OP_COL_IDS[i]] += "\n" + this.line;
 			else if (i >= OP_AMOUNT_IDX)
