@@ -60,7 +60,7 @@ var renderers = {
 		return "";
 	},
 	"1line": function(sta){
-		return sta.filePath.split("/").pop() + " -> " + sta.ops.length + " operations -> closing balance: " + sta.balTo;
+		return sta.filePath.split("/").pop() + " (" + sta.dateFrom + " to " + sta.dateTo + ") -> " + sta.ops.length + " operations -> closing balance: " + sta.balTo;
 	},
 	"test": function(sta){
 		return [
