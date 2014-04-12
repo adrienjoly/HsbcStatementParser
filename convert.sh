@@ -7,7 +7,8 @@ cd `dirname "$0"`
 cd tmp
 for pdfFile in *.pdf
 do
-	echo converting $pdfFile "->" $pdfFile.csv ...
+	#echo converting $pdfFile "->" $pdfFile.csv ...
+	node ../hsbcextr.js 1line $pdfFile
 	node ../hsbcextr.js csv2 $pdfFile >"$pdfFile.csv"
 done
 cd ..
