@@ -40,7 +40,7 @@ var renderers = {
 			return [
 				op.date + "." + (year - nbYears + op.yearOffset),
 				"\"" + op.text.replace(/[\"]+/g, "\\\"").replace("CB N\n", "CB N") + "\"",
-				op.datev,
+				"\"" + op.datev + "\"",
 				op.exo,
 				op.debit,
 				op.credit,
