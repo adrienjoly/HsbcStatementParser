@@ -77,6 +77,9 @@ var renderers = {
 			"Total debit: " + sta.totDebit,
 			"Total credit: " + sta.totCredit,
 		]).join("\n");
+	},
+	"debug": function(sta){
+		return "";
 	}
 };
 
@@ -93,7 +96,7 @@ var renderers = {
 			var pdfFilePath = pdfFiles.shift();
 			if (!pdfFilePath)
 				return;
-			var parser = new HsbcStatementParser();
+			var parser = new HsbcStatementParser({debug: process.argv[2] == "debug"});
 			//console.warn("\n___\nLoading " + pdfFilePath + " ...\n");
 			parser.parseFile(pdfFilePath, function(err, bankStatement){
 				try {

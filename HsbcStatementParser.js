@@ -1,6 +1,9 @@
+var sys = require("sys");
 var assert = require("assert");
 var PFParser = require("./node_modules/pdf2json/pdfparser");
 // doc: https://github.com/modesty/pdf2json
+
+var LOG = global.LOG || function(){};
 
 function parseAmount(str){
 	return parseFloat(str.replace(/\./g, '').replace(",", "."));
@@ -37,13 +40,13 @@ function HsbcCursor(lines){
 	this.detectColumns = function(){
 		//for (var i in OP_COLS)
 		//	colPos.push(cur.rawLine[1]);
-		//console.log("column positions\n" + OP_COLS.join("\t") + "\n" + colPos.join("\t"));
+		LOG("column positions\n" + OP_COLS.join("\t") + "\n\t" + colPos.join("\t"));
 		this.parseUntil(OP_COLS[OP_COLS.length-1]);
 	};
 
 	function parseOperation(){
 		var op = {};
-		//console.log("===new op");
+		LOG("===new op");
 		assert.ok(this.line && this.line.match(RE_DATE_SHORT), "operation must start with a short date: "+this.line);
 		for(;;) {
 			if (this.line && this.line.indexOf(INTERMEDIATE_BALANCE) == 0) {
@@ -61,12 +64,12 @@ function HsbcCursor(lines){
 			if (op.debit && i > OP_AMOUNT_IDX) {
 				// reading a "credit" value after having read a "debit" value for the same operation
 				// => current line might be a page number => skip to next page's operations
-				//console.log(" - - - skipping to next operations - - - ");
+				LOG(" - - - skipping to next operations - - - ");
 				this.parseUntil(NEXT_PAGE_HEADER);
 				this.detectColumns();
 				this.next();
 				if (!this.line || this.line.match(RE_DATE_SHORT)) {
-					//console.log("(i) no more line, or new operation => end of current operation");
+					LOG("(i) no more line, or new operation => end of current operation");
 					return op;
 				}
 				else
@@ -82,7 +85,7 @@ function HsbcCursor(lines){
 				op[OP_COL_IDS[i]] = this.line;
 			this.next();
 			if (!this.line || this.rawLine[1] < colPos[0] || this.line == END_OF_OPERATIONS) {
-				//console.log("(i) no more line, or new operation => end of current operation");
+				LOG("(i) no more line, or new operation => end of current operation");
 				return op;
 			}
 		}
@@ -95,7 +98,7 @@ function HsbcCursor(lines){
 			var op = parseOperation.call(this);
 			if (op) {
 				ops.push(op);
-				//console.log("op:", op);
+				LOG("op:", op);
 			}
 			else
 				break;
@@ -107,7 +110,17 @@ function HsbcCursor(lines){
 
 HsbcCursor.prototype = new Cursor;
 
-function HsbcStatementParser(){
+function HsbcStatementParser(options){
+
+	options = options || {};
+	LOG = !options.debug ? function(){} : function(){
+		for (var i in arguments)
+			if (arguments[i] instanceof Object || arguments[i] instanceof Array)
+				arguments[i] = sys.inspect(arguments[i]);
+		console.log("[DEBUG] " + Array.prototype.join.call(arguments, " "));
+	};
+
+	LOG("DEBUG MODE");
 
 	var RE_DATE = /\d\d\.\d\d\.\d\d\d\d/g;
 
@@ -133,9 +146,9 @@ function HsbcStatementParser(){
 	pdfParser.on("pdfParser_dataReady", function(pdfData){
 		try{
 			var lines = extractLines(pdfData);
-			//console.log("read " + lines.length + " lines => parsing...")
+			LOG("read " + lines.length + " lines => parsing...");
 			parseLines(lines);
-			//console.log("done parsing!")
+			LOG("done parsing!");
 			callbackFct(null, bankSta);
 		}
 		catch(e){
@@ -157,7 +170,7 @@ function HsbcStatementParser(){
 
 	function validateTotals(/*bankSta*/){
 		var totalDebit = 0, totalCredit = 0;
-		//console.log("validating totals for " + bankSta.ops.length + "operations...");
+		LOG("validating totals for " + bankSta.ops.length + "operations...");
 		bankSta.ops.map(function(op){
 			if (op.debit)
 				totalDebit += op.debit;
@@ -166,7 +179,7 @@ function HsbcStatementParser(){
 			else
 				throw new Error("operation without credit or debit");
 		});
-		//console.log(totalDebit, totalCredit);
+		LOG("total debit:", totalDebit, "total credit:", totalCredit);
 		assert(Math.abs(totalDebit - bankSta.totDebit) < 0.001, "total debit is not valid");
 		assert(Math.abs(totalCredit - bankSta.totCredit) < 0.001, "total credit is not valid");
 		return totalCredit - totalDebit;
@@ -178,27 +191,34 @@ function HsbcStatementParser(){
 		cur.parseUntil("Votre Relevé de Compte");
 		cur.parseUntil("Compte n°");
 		bankSta.acctNum = cur.next() + cur.next();
+		LOG("acctNum:", bankSta.acctNum);
 
 		cur.parseUntil("Période");
 		var periode = cur.next().match(RE_DATE);
 		bankSta.dateTo = periode.pop();
+		LOG("dateTo:", bankSta.dateTo);
 		bankSta.dateFrom = periode.pop();
+		LOG("dateFrom:", bankSta.dateFrom);
 
 		cur.detectColumns();
 
 		cur.parseUntil("SOLDE DE DEBUT DE PERIODE");
 		bankSta.balFrom = parseAmount(cur.next());
+		LOG("bafFrom:", bankSta.balFrom);
 
 		bankSta.ops = cur.parseOperations();
 		bankSta.totDebit = parseAmount(cur.next());
+		LOG("totDebit:", bankSta.totDebit);
 		bankSta.totCredit = parseAmount(cur.next());
-		//console.log(bankSta.totDebit, bankSta.totCredit);
+		LOG("totCredit:", bankSta.totCredit);
 		var total = validateTotals(bankSta);
 
 		cur.parseUntil("SOLDE DE FIN DE PERIODE");
 		bankSta.balTo = parseAmount(cur.next());
-		//console.log(["balance   (to - from): ", bankSta.balTo, bankSta.balFrom, Math.round((bankSta.balTo - bankSta.balFrom) * 100)/100].join(' '));
-		//console.log(["total (credit - debit):", bankSta.totCredit, bankSta.totDebit, Math.round((bankSta.totCredit - bankSta.totDebit) * 100)/100].join(' '));
+		LOG("bafFrom:", bankSta.balTo);
+
+		LOG(["validating balance   (to - from): ", bankSta.balTo, bankSta.balFrom, Math.round((bankSta.balTo - bankSta.balFrom) * 100)/100].join(' '));
+		LOG(["validating total (credit - debit):", bankSta.totCredit, bankSta.totDebit, Math.round((bankSta.totCredit - bankSta.totDebit) * 100)/100].join(' '));
 		assert(Math.abs(bankSta.balFrom + total - bankSta.balTo) < 0.001, "totals don't match");
 
 		return bankSta;
