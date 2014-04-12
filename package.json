@@ -1,6 +1,6 @@
 {
   "name": "hsbc-statement-parser",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "license": "BSD",
   "description": "Parses and converts HSBC bank statements downloaded in PDF format into a list of operations in JSON or TSV format.",
   "homepage": "https://github.com/adrienjoly/HsbcStatementParser",
