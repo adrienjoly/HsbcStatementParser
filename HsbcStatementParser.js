@@ -64,25 +64,27 @@ function HsbcCursor(lines){
 
 			LOG("x-position", this.rawLine[1], "-> field", OP_COL_IDS[i], "=", this.line);
 
-			if (op.debit && i > OP_AMOUNT_IDX) {
-				// reading a "credit" value after having read a "debit" value for the same operation
-				// => current line might be a page number => skip to next page's operations
-				LOG(" - - - skipping to next operations - - - ");
-				this.parseUntil(NEXT_PAGE_HEADER);
-				this.detectColumns();
-				this.next();
-				if (!this.line || this.line.match(RE_DATE_SHORT)) {
-					LOG("(i) no more line, or new operation => end of current operation");
-					return op;
+			// set (or append to) operation's current field
+			if (i >= OP_AMOUNT_IDX) {
+				if (op.debit || op.credit) {
+					// we already parsed a debit or credit for this operation
+					// => current line might be a page number => skip to next page
+					LOG(" - - - skipping to next page - - - ");
+					this.parseUntil(NEXT_PAGE_HEADER);
+					this.detectColumns();
+					this.next();
+					if (!this.line || this.line.match(RE_DATE_SHORT)) {
+						LOG("(i) no more line, or new operation => end of current operation");
+						return op;
+					}
+					else
+						continue; // re-read the current line
 				}
 				else
-					continue; // re-read the current line
+					op[OP_COL_IDS[i]] = parseAmount(this.line);
 			}
-			// set (or append to) operation's current field 
-			if (op[OP_COL_IDS[i]])
+			else if (i == 1 && op[OP_COL_IDS[i]])
 				op[OP_COL_IDS[i]] += "\n" + this.line;
-			else if (i >= OP_AMOUNT_IDX)
-				op[OP_COL_IDS[i]] = parseAmount(this.line);
 			else
 				op[OP_COL_IDS[i]] = this.line;
 			this.next();
