@@ -3,9 +3,9 @@ HsbcStatementParser
 
 Parses and converts [HSBC](http://hsbc.com) bank statements downloaded in PDF format into a list of operations in JSON or TSV format.
 
-Relies on [Modesty's PDF2JSON](http://github.com/modesty/pdf2json) Node.js module.
+Relies on [pdfreader](https://www.npmjs.com/package/pdfreader) Node.js module.
 
-Only supports statements in French language, for now.
+**Only supports statements in French language, for now.**
 
 Installation
 ------------
