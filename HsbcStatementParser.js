@@ -180,6 +180,8 @@ function HsbcStatementParser(options){
 				totalDebit += op.debit;
 			else if (op.credit)
 				totalCredit += op.credit;
+			else if (op.text == "AGIOS SUR DECOUVERT\nFRANCHISE CONV. HEXAGONE")
+				console.warn("operation without credit or debit:", op);
 			else
 				throw new Error("operation without credit or debit");
 		});
